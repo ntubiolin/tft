@@ -32,8 +32,11 @@ import shutil
 import data_formatters.base
 import libs.utils as utils
 import numpy as np
+import numpy.ma as ma
 import pandas as pd
 import tensorflow.compat.v1 as tf
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import math_ops
 
 # Layer definitions.
 concat = tf.keras.backend.concatenate
@@ -626,7 +629,7 @@ class TemporalFusionTransformer(object):
 
     print('Cached data "{}" updated'.format(cache_key))
 
-  def _batch_sampled_data(self, data, max_samples):
+  def _batch_sampled_data(self, data, max_samples, step_size=6):
     """Samples segments into a compatible format.
 
     Args:
@@ -652,10 +655,11 @@ class TemporalFusionTransformer(object):
     for identifier, df in data.groupby(id_col):
       print('Getting locations for {}'.format(identifier))
       num_entries = len(df)
-      if num_entries >= self.time_steps:
+      if num_entries >= self.time_steps * step_size:
+        #TODO
         valid_sampling_locations += [
-            (identifier, self.time_steps + i)
-            for i in range(num_entries - self.time_steps + 1)
+            (identifier, self.time_steps * step_size + i)
+            for i in range(num_entries - self.time_steps * step_size + 1)
         ]
       split_data_map[identifier] = df
 
@@ -688,21 +692,24 @@ class TemporalFusionTransformer(object):
       if (i + 1 % 1000) == 0:
         print(i + 1, 'of', max_samples, 'samples done...')
       identifier, start_idx = tup
+      # TODO
       sliced = split_data_map[identifier].iloc[start_idx -
-                                               self.time_steps:start_idx]
+                                               self.time_steps * step_size:start_idx:step_size]
+      # breakpoint()
       inputs[i, :, :] = sliced[input_cols]
       outputs[i, :, :] = sliced[[target_col]]
       time[i, :, 0] = sliced[time_col]
       identifiers[i, :, 0] = sliced[id_col]
-
+    gt = outputs[:, self.num_encoder_steps:, :]
+    sample_weights = gt > 0  # ma.masked_where(gt > 0, gt).mask
     sampled_data = {
         'inputs': inputs,
         'outputs': outputs[:, self.num_encoder_steps:, :],
-        'active_entries': np.ones_like(outputs[:, self.num_encoder_steps:, :]),
+        'active_entries': sample_weights,  # np.ones_like(outputs[:, self.num_encoder_steps:, :]),#
         'time': time,
         'identifier': identifiers
     }
-
+    # breakpoint()
     return sampled_data
 
   def _batch_data(self, data):
@@ -719,13 +726,13 @@ class TemporalFusionTransformer(object):
     """
 
     # Functions.
-    def _batch_single_entity(input_data):
+    def _batch_single_entity(input_data, step_size=6):
       time_steps = len(input_data)
       lags = self.time_steps
       x = input_data.values
-      if time_steps >= lags:
+      if time_steps >= lags * time_steps:
         return np.stack(
-            [x[i:time_steps - (lags - 1) + i, :] for i in range(lags)], axis=1)
+            [x[i: time_steps - (lags - 1 ) * step_size + i, :] for i in range(0, lags * step_size, step_size)], axis=1)
 
       else:
         return None
@@ -764,8 +771,8 @@ class TemporalFusionTransformer(object):
 
     # Shorten target so we only get decoder steps
     data_map['outputs'] = data_map['outputs'][:, self.num_encoder_steps:, :]
-
-    active_entries = np.ones_like(data_map['outputs'])
+    active_entries = data_map['outputs'] > 0  #ma.masked_where(data_map['outputs'] > 0, data_map['outputs']).mask
+    # active_entries = np.ones_like(data_map['outputs'])
     if 'active_entries' not in data_map:
       data_map['active_entries'] = active_entries
     else:
@@ -775,6 +782,7 @@ class TemporalFusionTransformer(object):
 
   def _get_active_locations(self, x):
     """Formats sample weights for Keras training."""
+    # breakpoint()
     return (np.sum(x, axis=-1) > 0.0) * 1.0
 
   def _build_base_graph(self):
@@ -1052,7 +1060,7 @@ class TemporalFusionTransformer(object):
 
       model = tf.keras.Model(inputs=all_inputs, outputs=outputs)
 
-      print(model.summary())
+      # print(model.summary())
 
       valid_quantiles = self.quantiles
       output_size = self.output_size
@@ -1080,19 +1088,67 @@ class TemporalFusionTransformer(object):
             b: Predictions
           """
           quantiles_used = set(self.quantiles)
-
           loss = 0.
           for i, quantile in enumerate(valid_quantiles):
             if quantile in quantiles_used:
               loss += utils.tensorflow_quantile_loss(
                   a[Ellipsis, output_size * i:output_size * (i + 1)],
                   b[Ellipsis, output_size * i:output_size * (i + 1)], quantile)
+          # loss = tf.Print(loss, [tf.shape(loss), tf.shape(a), tf.shape(b)], 'In Q loss')
           return loss
 
-      quantile_loss = QuantileLossCalculator(valid_quantiles).quantile_loss
+      class SolarMSELossCalculator(object):
 
+        def __init__(self, mask_night=True, eps=1e-6, k=-1):
+          """
+          Args:
+            mask_night: whether you want to mask loss calculation at night
+          """
+          self.mask_night = mask_night
+          # self.MSE = tf.keras.losses.MSE
+          self.eps = eps
+          self.k = k
+
+        def mean_squared_error(self, y_true, y_pred):
+          y_pred = ops.convert_to_tensor(y_pred)
+          y_true = math_ops.cast(y_true, y_pred.dtype)
+          se = math_ops.squared_difference(y_pred, y_true)
+          return se
+          # se = tf.Print(se, [tf.shape(se)], 'Test print')
+          # return K.mean(se, axis=-1)
+
+        def mse_loss(self, ground_truth, model_ouput):
+          """
+          Args:
+            ground_truth: Targets of shape [bs, target_time_steps, output_size] e.g. [64, 6, 3]
+            model_ouput: Predictions
+          """
+
+          # ground_truth_mask = tf.where(tf.greater(ground_truth, 0), tf.ones_like(ground_truth), tf.zeros_like(ground_truth))
+          # model_ouput *= ground_truth_mask
+          loss = 0.
+          loss = self.mean_squared_error(ground_truth, model_ouput)
+          sum_of_loss = tf.reduce_sum(loss, axis=-1)
+
+          # sum_of_mask = tf.reduce_sum(ground_truth_mask, axis=-1)   # Sum over axis 0 (batch size axis).
+          
+          # sum_of_mask = tf.where(tf.equal(sum_of_mask, 0), tf.fill(tf.shape(sum_of_mask), self.eps), sum_of_mask) # Avoid division by 0.
+          
+          loss = sum_of_loss  #/ sum_of_mask
+          # loss = tf.Print(loss, [loss], 'Test print>>>>>>>>>>>')
+          
+          # ground_truth_mask = tf.reshape(ground_truth_mask, shape=(tf.shape(ground_truth_mask)[0], -1))
+          # loss = tf.reshape(loss, shape=(tf.shape(loss)[0], -1))
+          if self.k == -1:
+            return loss
+          else:
+            return loss[self.k]
+
+      # quantile_loss = QuantileLossCalculator(valid_quantiles).quantile_loss
+      mse_loss = SolarMSELossCalculator(mask_night=True).mse_loss
+      # mse_loss = QuantileLossCalculator(valid_quantiles).quantile_loss
       model.compile(
-          loss=quantile_loss, optimizer=adam, sample_weight_mode='temporal')
+          loss=mse_loss, optimizer=adam, sample_weight_mode='temporal')
 
       self._input_placeholder = all_inputs
 
@@ -1127,7 +1183,7 @@ class TemporalFusionTransformer(object):
       print('Using cached training data')
       train_data = TFTDataCache.get('train')
     else:
-      train_data = self._batch_data(valid_df)
+      train_data = self._batch_data(train_df)
 
     if valid_df is None:
       print('Using cached validation data')
