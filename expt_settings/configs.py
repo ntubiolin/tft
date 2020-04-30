@@ -26,6 +26,7 @@ import data_formatters.electricity
 import data_formatters.favorita
 import data_formatters.traffic
 import data_formatters.volatility
+import data_formatters.inverter
 
 
 class ExperimentConfig(object):
@@ -42,7 +43,7 @@ class ExperimentConfig(object):
       experiment.
   """
 
-  default_experiments = ['volatility', 'electricity', 'traffic', 'favorita']
+  default_experiments = ['volatility', 'electricity', 'traffic', 'favorita', 'inverter']
 
   def __init__(self, experiment='volatility', root_folder=None):
     """Creates configs based on default experiment chosen.
@@ -81,7 +82,8 @@ class ExperimentConfig(object):
         'volatility': 'formatted_omi_vol.csv',
         'electricity': 'hourly_electricity.csv',
         'traffic': 'hourly_data.csv',
-        'favorita': 'favorita_consolidated.csv'
+        'favorita': 'favorita_consolidated.csv',
+        'inverter': 'inverter.csv'
     }
 
     return os.path.join(self.data_folder, csv_map[self.experiment])
@@ -89,7 +91,7 @@ class ExperimentConfig(object):
   @property
   def hyperparam_iterations(self):
 
-    return 240 if self.experiment == 'volatility' else 60
+    return 240 if self.experiment == 'volatility' else 3  # 60
 
   def make_data_formatter(self):
     """Gets a data formatter object for experiment.
@@ -97,12 +99,13 @@ class ExperimentConfig(object):
     Returns:
       Default DataFormatter per experiment.
     """
-
+    
     data_formatter_class = {
         'volatility': data_formatters.volatility.VolatilityFormatter,
         'electricity': data_formatters.electricity.ElectricityFormatter,
         'traffic': data_formatters.traffic.TrafficFormatter,
-        'favorita': data_formatters.favorita.FavoritaFormatter
+        'favorita': data_formatters.favorita.FavoritaFormatter,
+        'inverter': data_formatters.inverter.InverterFormatter
     }
 
     return data_formatter_class[self.experiment]()
