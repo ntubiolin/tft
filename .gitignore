@@ -22,3 +22,5 @@ dist/
 outputs/
 datasets/
 datasets
+
+settings.json
