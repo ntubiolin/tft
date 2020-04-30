@@ -21,8 +21,8 @@ import pathlib
 
 import numpy as np
 import tensorflow.compat.v1 as tf
-from tensorflow.compat.v1.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
-
+# from tensorflow.compat.v1.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
+from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
 # Generic.
 def get_single_col_by_input_type(input_type, column_definition):

@@ -89,9 +89,7 @@ def download_and_unzip(url, zip_path, csv_path, data_folder):
     csv_path: Expected path to csv file
     data_folder: Folder in which data is stored.
   """
-
   download_from_url(url, zip_path)
-
   unzip(zip_path, csv_path, data_folder)
 
   print('Done.')
@@ -101,7 +99,7 @@ def download_and_unzip(url, zip_path, csv_path, data_folder):
 def download_volatility(config):
   """Downloads volatility data from OMI website."""
 
-  url = 'https://realized.oxford-man.ox.ac.uk/images/oxfordmanrealizedvolatilityindices.zip'
+  url = 'http://realized.oxford-man.ox.ac.uk/images/oxfordmanrealizedvolatilityindices.zip'
 
   data_folder = config.data_folder
   csv_path = os.path.join(data_folder, 'oxfordmanrealizedvolatilityindices.csv')
@@ -190,7 +188,7 @@ def download_volatility(config):
 def download_electricity(config):
   """Downloads electricity dataset from UCI repository."""
 
-  url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/00321/LD2011_2014.txt.zip'
+  url = 'http://archive.ics.uci.edu/ml/machine-learning-databases/00321/LD2011_2014.txt.zip'
 
   data_folder = config.data_folder
   csv_path = os.path.join(data_folder, 'LD2011_2014.txt')
@@ -254,7 +252,7 @@ def download_electricity(config):
 def download_traffic(config):
   """Downloads traffic dataset from UCI repository."""
 
-  url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/00204/PEMS-SF.zip'
+  url = 'http://archive.ics.uci.edu/ml/machine-learning-databases/00204/PEMS-SF.zip'
 
   data_folder = config.data_folder
   csv_path = os.path.join(data_folder, 'PEMS_train')
@@ -409,13 +407,13 @@ def process_favorita(config):
   """Processes Favorita dataset.
 
   Makes use of the raw files should be manually downloaded from Kaggle @
-    https://www.kaggle.com/c/favorita-grocery-sales-forecasting/data
+    http://www.kaggle.com/c/favorita-grocery-sales-forecasting/data
 
   Args:
     config: Default experiment config for Favorita
   """
 
-  url = 'https://www.kaggle.com/c/favorita-grocery-sales-forecasting/data'
+  url = 'http://www.kaggle.com/c/favorita-grocery-sales-forecasting/data'
 
   data_folder = config.data_folder
 
