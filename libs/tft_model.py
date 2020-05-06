@@ -822,8 +822,8 @@ class TemporalFusionTransformer(object):
                                  axis=-1)
 
     # Isolate only known future inputs.
-    future_inputs = known_combined_layer[:, encoder_steps:, :]
-
+    # future_inputs = known_combined_layer[:, encoder_steps:, :]
+    future_inputs = tf.zeros_like(known_combined_layer[:, encoder_steps:, :])
     def static_combine_and_mask(embedding):
       """Applies variable selection network to static inputs.
 

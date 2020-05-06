@@ -139,7 +139,8 @@ def main(expt_name, use_gpu, restart_opt, model_folder, hyperparam_iterations,
     output_map = model.predict(test, return_targets=True)
     targets = data_formatter.format_predictions(output_map["targets"])
     p50_forecast = data_formatter.format_predictions(output_map["p50"])
-    breakpoint()
+    targets.to_csv('../TFT_ground_truth.csv')
+    p50_forecast.to_csv('../TFT_prediction.csv')
     p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
     def extract_numerical_data(data):
