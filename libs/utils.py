@@ -194,7 +194,7 @@ def load(tf_session, model_folder, cp_name, scope=None, verbose=False):
 
   print('Loading model from {0}'.format(load_path))
 
-  print_weights_in_checkpoint(model_folder, cp_name)
+  # print_weights_in_checkpoint(model_folder, cp_name)
 
   initial_vars = set(
       [v.name for v in tf.get_default_graph().as_graph_def().node])

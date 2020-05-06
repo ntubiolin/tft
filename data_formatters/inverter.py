@@ -97,7 +97,7 @@ class InverterFormatter(GenericDataFormatter):
     Args:
       df: Data to use to calibrate scalers.
     """
-    print('Setting scalers with training data...')
+    print('Setting scalers with all data...')
 
     column_definitions = self.get_column_definition()
     id_column = utils.get_single_col_by_input_type(InputTypes.ID,
@@ -185,6 +185,7 @@ class InverterFormatter(GenericDataFormatter):
     output = pd.concat(df_list, axis=0)
 
     # Format categorical inputs
+    # 'DeviceNo' is also processed here!
     for col in categorical_inputs:
       string_df = df[col].apply(str)
       output[col] = self._cat_scalers[col].transform(string_df)
@@ -205,10 +206,15 @@ class InverterFormatter(GenericDataFormatter):
       raise ValueError('Scalers have not been set!')
 
     column_names = predictions.columns
-
+    column_definitions = self.get_column_definition()
+    id_col = utils.get_single_col_by_input_type(InputTypes.ID,
+                                                column_definitions)
     df_list = []
     for identifier, sliced in predictions.groupby('identifier'):
       sliced_copy = sliced.copy()
+      # breakpoint()
+      identifier = self._cat_scalers[id_col].inverse_transform([identifier])[0]
+     
       target_scaler = self._target_scaler[identifier]
 
       for col in column_names:
@@ -258,6 +264,6 @@ class InverterFormatter(GenericDataFormatter):
     Returns:
       Tuple of (training samples, validation samples)
     """
-    return 50000,  5000
-    # return 1396604, 338337
+    # return 50000,  5000
+    return 1396604, 338337
     return 450000, 50000

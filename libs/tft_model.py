@@ -730,7 +730,7 @@ class TemporalFusionTransformer(object):
       time_steps = len(input_data)
       lags = self.time_steps
       x = input_data.values
-      if time_steps >= lags * time_steps:
+      if time_steps >= lags:
         return np.stack(
             [x[i: time_steps - (lags - 1 ) * step_size + i, :] for i in range(0, lags * step_size, step_size)], axis=1)
 
@@ -767,7 +767,10 @@ class TemporalFusionTransformer(object):
 
     # Combine all data
     for k in data_map:
-      data_map[k] = np.concatenate(data_map[k], axis=0)
+      try:
+        data_map[k] = np.concatenate(data_map[k], axis=0)
+      except Exception as e: 
+        breakpoint()
 
     # Shorten target so we only get decoder steps
     data_map['outputs'] = data_map['outputs'][:, self.num_encoder_steps:, :]
@@ -1256,7 +1259,7 @@ class TemporalFusionTransformer(object):
         use_multiprocessing=True)
 
     metrics = pd.Series(metric_values, self.model.metrics_names)
-
+    # breakpoint()
     return metrics[eval_metric]
 
   def predict(self, df, return_targets=False):
@@ -1272,7 +1275,6 @@ class TemporalFusionTransformer(object):
     """
 
     data = self._batch_data(df)
-
     inputs = data['inputs']
     time = data['time']
     identifier = data['identifier']
@@ -1426,6 +1428,7 @@ class TemporalFusionTransformer(object):
       self.model.load_weights(serialisation_path)
     else:
       # Loads tensorflow graph for optimal models.
+      
       utils.load(
           tf.keras.backend.get_session(),
           model_folder,
